@@ -11,6 +11,7 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
@@ -28,6 +29,7 @@ func kubeconfigPath() string {
 func newClientset() (*kubernetes.Clientset, error) {
 	kubeconfig := kubeconfigPath()
 	config, _ := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	config.WarningHandler = rest.NoWarnings{}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -50,6 +52,7 @@ func getCurrentContext() (*api.Context, error) {
 func newDynamicClient() (*dynamic.DynamicClient, error) {
 	kubeconfig := kubeconfigPath()
 	config, _ := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	config.WarningHandler = rest.NoWarnings{}
 
 	clientset, err := dynamic.NewForConfig(config)
 	if err != nil {

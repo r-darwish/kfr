@@ -34,7 +34,7 @@ func deleteCustomResource(ctx context.Context, dynamicClient *dynamic.DynamicCli
 		return nil
 	}
 
-	slog.WarnContext(ctx, "Custom resource did not terminate in time", "name", name, "namespace", namespace)
+	slog.WarnContext(ctx, "Custom resource did not terminate in time. Deleting its finializers", "name", name, "namespace", namespace)
 
 	obj, err := dynamicClient.Resource(crd).Namespace(namespace).Get(ctx, name, v1.GetOptions{})
 	if err != nil {
@@ -43,6 +43,10 @@ func deleteCustomResource(ctx context.Context, dynamicClient *dynamic.DynamicCli
 	obj.SetFinalizers([]string{})
 	_, err = dynamicClient.Resource(crd).Namespace(namespace).Update(ctx, obj, v1.UpdateOptions{})
 	if err != nil {
+		var statusErr *k8serror.StatusError
+		if errors.As(err, &statusErr) && (statusErr.Status().Code == 404 || statusErr.Status().Code == 409) {
+			return nil
+		}
 		return fmt.Errorf("error removing finalizers from custom resource %s in namespace %s: %w", name, namespace, err)
 	}
 
@@ -75,7 +79,6 @@ func purgeCRD(ctx context.Context, dynamicClient *dynamic.DynamicClient, crd sch
 		}
 
 		for _, item := range list.Items {
-			slog.Info("Found custom resource", "name", item.GetName(), "namespace", namespace, "crd", crd.String())
 			pool.Go(func(ctx context.Context) (struct{}, error) {
 				return struct{}{}, deleteCustomResource(ctx, dynamicClient, item.GetName(), crd, namespace)
 			})
