@@ -5,6 +5,7 @@ go 1.22.4
 require (
 	github.com/mittwald/go-helm-client v0.12.9
 	github.com/sourcegraph/conc v0.3.0
+	golang.org/x/term v0.18.0
 	helm.sh/helm/v3 v3.15.2
 	k8s.io/apiextensions-apiserver v0.30.0
 	k8s.io/apimachinery v0.30.2
@@ -122,7 +123,6 @@ require (
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
