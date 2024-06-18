@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 )
 
@@ -33,6 +34,17 @@ func newClientset() (*kubernetes.Clientset, error) {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+func getCurrentContext() (*api.Context, error) {
+	config, err := clientcmd.LoadFromFile(kubeconfigPath())
+
+	if err != nil {
+		return nil, err
+	}
+
+	currentContext := config.Contexts[config.CurrentContext]
+	return currentContext, nil
 }
 
 func newDynamicClient() (*dynamic.DynamicClient, error) {

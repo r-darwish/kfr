@@ -3,12 +3,25 @@ package kfr
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/term"
 )
 
 func Purge() error {
 	ctx := context.Background()
+
+	currentContext, err := getCurrentContext()
+	if err != nil {
+		return fmt.Errorf("error getting cluster name: %w", err)
+	}
+
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Printf("Purging cluster %s with user %s. Press enter to continue", currentContext.Cluster, currentContext.AuthInfo)
+		fmt.Scanln()
+	}
+
 	clientset, err := newClientset()
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %w", err)
