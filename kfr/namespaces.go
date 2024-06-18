@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/sourcegraph/conc/pool"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -47,31 +48,46 @@ func getNonDefaultNamespaces(ctx context.Context, clientset *kubernetes.Clientse
 	return namespaces, nil
 }
 
+func deleteNamespace(ctx context.Context, clientset *kubernetes.Clientset, namespace string) error {
+	slog.InfoContext(ctx, "deleting namespace", "namespace", namespace)
+	err := clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete namespace %s: %w", namespace, err)
+	}
+
+	terminated, err := waitForTermination(ctx, 10*time.Second, func() error {
+		_, err := clientset.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		return err
+	})
+
+	if err != nil {
+		return fmt.Errorf("error waiting for namespace to be deleted: %w", err)
+	}
+
+	if !terminated {
+		return fmt.Errorf("namespace %s was not deleted", namespace)
+	}
+
+	return nil
+}
+
 func deleteNamespaces(ctx context.Context, clientset *kubernetes.Clientset) error {
-	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
+	namespaces, err := getNonDefaultNamespaces(ctx, clientset)
+	if err != nil {
+		return fmt.Errorf("error getting namespaces: %w", err)
+	}
 
-	for {
-		namespaces, err := getNonDefaultNamespaces(ctx, clientset)
-		if err != nil {
-			return fmt.Errorf("error getting namespaces: %w", err)
-		}
+	pool := pool.NewWithResults[struct{}]().WithContext(ctx)
+	for _, namespace := range namespaces {
+		pool.Go(func(ctx context.Context) (struct{}, error) {
+			err := deleteNamespace(ctx, clientset, namespace)
+			return struct{}{}, err
+		})
+	}
 
-		if len(namespaces) == 0 {
-			break
-		}
-
-		for _, namespace := range namespaces {
-			slog.InfoContext(ctx, "deleting namespace", "namespace", namespace)
-			err := clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to delete namespace %s: %w", namespace, err)
-			}
-		}
-
-		err = sleep(ctx, 1*time.Second)
-		if err != nil {
-			return err
-		}
+	_, err = pool.Wait()
+	if err != nil {
+		return fmt.Errorf("error deleting namespaces: %w", err)
 	}
 
 	return nil

@@ -58,7 +58,9 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 
 func waitForTermination(ctx context.Context, timeout time.Duration, fn func() error) (bool, error) {
-	ctx, _ = context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	for {
 		err := fn()
 		var statusErr *k8serror.StatusError
