@@ -56,6 +56,11 @@ func Purge() error {
 		return fmt.Errorf("error deleting flux leftovers: %w", err)
 	}
 
+	err = deleteAllPods(ctx, clientset, namespaces)
+	if err != nil {
+		return fmt.Errorf("error deleting pods: %w", err)
+	}
+
 	err = deleteNamespaces(ctx, clientset)
 	if err != nil {
 		return fmt.Errorf("error deleting namespaces: %w", err)
