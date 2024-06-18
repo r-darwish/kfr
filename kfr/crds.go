@@ -90,6 +90,10 @@ func purgeCRD(ctx context.Context, dynamicClient *dynamic.DynamicClient, crd sch
 
 	err = dynamicClient.Resource(crdGVR()).Delete(ctx, crdName, v1.DeleteOptions{})
 	if err != nil {
+		var statusErr *k8serror.StatusError
+		if errors.As(err, &statusErr) && statusErr.Status().Code == 404 {
+			return nil
+		}
 		return fmt.Errorf("error deleting CRD %s: %w", crdName, err)
 	}
 
