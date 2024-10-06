@@ -23,7 +23,6 @@ func kubeconfigPath() string {
 	}
 
 	return filepath.Join(homedir.HomeDir(), ".kube", "config")
-
 }
 
 func newClientset() (*kubernetes.Clientset, error) {
@@ -40,7 +39,6 @@ func newClientset() (*kubernetes.Clientset, error) {
 
 func getCurrentContext() (*api.Context, error) {
 	config, err := clientcmd.LoadFromFile(kubeconfigPath())
-
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +76,8 @@ func waitForTermination(ctx context.Context, timeout time.Duration, fn func() er
 
 	for {
 		err := fn()
-		var statusErr *k8serror.StatusError
 		if err != nil {
-			if errors.As(err, &statusErr) && statusErr.Status().Code == 404 {
+			if k8serror.IsNotFound(err) {
 				return true, nil
 			} else {
 				return false, err

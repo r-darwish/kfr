@@ -2,7 +2,6 @@ package kfr
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -25,7 +24,6 @@ func deleteCustomResource(ctx context.Context, dynamicClient *dynamic.DynamicCli
 		_, err := dynamicClient.Resource(crd).Namespace(namespace).Get(ctx, name, v1.GetOptions{})
 		return err
 	})
-
 	if err != nil {
 		return fmt.Errorf("error waiting for custom resource %s to terminate: %w", name, err)
 	}
@@ -38,13 +36,15 @@ func deleteCustomResource(ctx context.Context, dynamicClient *dynamic.DynamicCli
 
 	obj, err := dynamicClient.Resource(crd).Namespace(namespace).Get(ctx, name, v1.GetOptions{})
 	if err != nil {
+		if k8serror.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("error getting custom resource %s in namespace %s: %w", name, namespace, err)
 	}
 	obj.SetFinalizers([]string{})
 	_, err = dynamicClient.Resource(crd).Namespace(namespace).Update(ctx, obj, v1.UpdateOptions{})
 	if err != nil {
-		var statusErr *k8serror.StatusError
-		if errors.As(err, &statusErr) && (statusErr.Status().Code == 404 || statusErr.Status().Code == 409) {
+		if k8serror.IsConflict(err) || k8serror.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("error removing finalizers from custom resource %s in namespace %s: %w", name, namespace, err)
@@ -54,7 +54,6 @@ func deleteCustomResource(ctx context.Context, dynamicClient *dynamic.DynamicCli
 		_, err := dynamicClient.Resource(crd).Namespace(namespace).Get(ctx, name, v1.GetOptions{})
 		return err
 	})
-
 	if err != nil {
 		return fmt.Errorf("error waiting for custom resource %s to terminate: %w", name, err)
 	}
@@ -71,8 +70,7 @@ func purgeCRD(ctx context.Context, dynamicClient *dynamic.DynamicClient, crd sch
 	for _, namespace := range namespaces {
 		list, err := dynamicClient.Resource(crd).Namespace(namespace).List(ctx, v1.ListOptions{})
 		if err != nil {
-			var statusErr *k8serror.StatusError
-			if errors.As(err, &statusErr) && statusErr.Status().Code == 404 {
+			if k8serror.IsNotFound(err) {
 				continue
 			}
 			return err
@@ -93,8 +91,7 @@ func purgeCRD(ctx context.Context, dynamicClient *dynamic.DynamicClient, crd sch
 
 	err = dynamicClient.Resource(crdGVR()).Delete(ctx, crdName, v1.DeleteOptions{})
 	if err != nil {
-		var statusErr *k8serror.StatusError
-		if errors.As(err, &statusErr) && statusErr.Status().Code == 404 {
+		if k8serror.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("error deleting CRD %s: %w", crdName, err)
